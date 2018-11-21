@@ -1,85 +1,98 @@
 apply plugin: 'com.android.application'
+repositories {
+    flatDir {
+        dirs 'libs'
+    }
+}
 
-          def getDate() {
-          def date = new Date()
-          def formattedDate = date.format('yyyyMMddHHmm')
-            return formattedDate
-       }
-        def verCode = 14
-        android {
-        //渠道Flavors
-        productFlavors {
-        xiaomi {
-            manifestPlaceholders = [UMENG_CHANNEL_VALUE: "xiaomi"]
-        }
-        wandoujia {
-            manifestPlaceholders = [UMENG_CHANNEL_VALUE:    "wandoujia"]
-        }
-         }
-
-        compileSdkVersion 23
-         buildToolsVersion "25.0.0"
-         signingConfigs {
+dependencies {
+    compile.exclude module: 'commons'
+    all*.exclude group: 'org.gradle.test.excludes', module: 'reports'
+}
+def getMyStoreFile(){
+    if("true".equals(IS_JENKINS)){
+        return file("使用Jenkins打包时的证书路径")
+    }else{
+        return file("使用Android Studio打包时证书路径")
+    }
+}
+android {
+      signingConfigs {
         release {
-            keyAlias 'androiddebugkey'
-            keyPassword ALIAS_PASSWORD
-            storeFile file('sinkkey.keystore')
-            storePassword STORE_PASSWORD
-            }
-           }
-            defaultConfig {
-        applicationId "zsw.testjenkins"
-        minSdkVersion 16
-        targetSdkVersion 23
-        versionCode verCode
-        versionName "1.0"
-        versionName APP_VERSION
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-           }
-          buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            keyAlias '*****'
+            keyPassword '****'
+            storeFile getMyStoreFile()
+            storePassword '****'
         }
+    }
+    compileSdkVersion Integer.parseInt(project.ANDROID_BUILD_SDK_VERSION)
+    buildToolsVersion project.ANDROID_BUILD_TOOLS_VERSION
+    dexOptions {
+        jumboMode true
+    }
+    defaultConfig {
+        applicationId project.APPLICATION_ID
+        minSdkVersion Integer.parseInt(project.ANDROID_BUILD_MIN_SDK_VERSION)
+        targetSdkVersion Integer.parseInt(project.ANDROID_BUILD_TARGET_SDK_VERSION)
+        versionName project.APP_VERSION
+        versionCode Integer.parseInt(project.VERSION_CODE)
+        ndk {
+            abiFilters "armeabi", "armeabi-v7a", "arm64-v8a", "mips", "mips64", "x86", "x86_64"
+        }
+        // Enabling multidex support.
+        multiDexEnabled true
+    }
+    buildTypes {
         debug {
+            minifyEnabled false
+            shrinkResources false
             signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
-          }
-
-//修改生成的apk名字及输出文件夹
-    applicationVariants.all { variant ->
+        release {
+            // 移除无用的resource文件
+            shrinkResources true
+            minifyEnabled true
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    android.applicationVariants.all { variant ->
         variant.outputs.each { output ->
             //新名字
             def newName
-            //时间戳
-            def timeNow
             //输出文件夹
             def outDirectory
             //是否为Jenkins打包，输出路径不同
             if ("true".equals(IS_JENKINS)) {
                 //BUILD_PATH为服务器输出路径
-                timeNow = BUILD_TIME
-                outDirectory = BUILD_PATH_JENKINS
-                //JKApp-v1.0.1-xiaomi-release.apk
-                newName = APPNAME+"-v"+APP_VERSION + '-' + variant.productFlavors[0].name + '-' + variant.buildType.name + '.apk'
+                outDirectory = BUILD_PATH
+                newName = "你的app名字" + "-" + defaultConfig.versionName + "-" + BUILD_TYPE + ".apk"
             } else {
-                //本机打包输出在本机路径
-                timeNow = getDate()
-                outDirectory = BUILD_PATH_LOCAL
-                newName = APPNAME+"-v"+APP_VERSION + '-' + variant.productFlavors[0].name + '-' + variant.buildType.name + '.apk'
+                outDirectory = output.outputFile.getParent()
+                newName = "你的app名字" + "-" + defaultConfig.versionName + "-" + BUILD_TYPE + ".apk"
             }
-            output.outputFile = new File(outDirectory+"/"+timeNow, newName)
+            output.outputFile = new File(outDirectory, newName)
         }
     }
-}
+    flavorDimensions("channel")
+    productFlavors {
+        yingyongbao { dimension "channel" }
+    }
+    productFlavors.all {
+        flavor -> flavor.manifestPlaceholders = [CHANNEL_VALUE: name]
+    }
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES.txt'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/dependencies.txt'
+        exclude 'META-INF/LGPL2.1'
+    }
 
-
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    })
-    compile 'com.android.support:appcompat-v7:23.0.0'
-    testCompile 'junit:junit:4.12'
 }
